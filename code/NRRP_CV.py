@@ -2,14 +2,13 @@ import h5py
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.stats import poisson
-import pandas as pd
 import AnalyzeTrace as at
 plt.style.use('seaborn-deep')
 
 # path to the raw data
-RAW_DATA_PATH = '/Users/natalibarros/Desktop/EPFL_BBP/MVR_warmupProject/Data_h5_files/invitro_raw.h5'
+RAW_DATA_PATH = '/home/barros/Desktop/Project_MVR/MVR_warmupProject/h5_data/invitro_raw.h5'
 #RAW_DATA_PATH2 = '/Users/natalibarros/Desktop/EPFL_BBP/MVR_warmupProject/Data_h5_files/noise_simulation_new_Noise_95/'
-RAW_DATA_PATH2 = '/Users/natalibarros/Desktop/EPFL_BBP/MVR_warmupProject/Data_h5_files/noise_simulation_new_Noise_400/'
+RAW_DATA_PATH2 = '/home/barros/Desktop/Project_MVR/MVR_warmupProject/h5_data/noise_simulation_newCirc_Noise400/'
 
 # total time of the recording
 SIMULATION_TIME = 1.3
@@ -32,6 +31,61 @@ t_wind_bef = 50
 TAU_MEM_EACH = {'c0':20.9, 'c1':19.1, 'c2':30.4, 'c4':32.9, 'c10':33.3, 'c12':35.5, 'c13':43.5, 'c14':41.2, 'c31':31.7, 'c59':28.6, 'c60':46.9, 'c61':31.6, 'c62':23.0, 'c63':22.7, 'c64':34.1, 'c65':18.4, 'c66':29.1, 'c67':22.0, 'c68':37.1, 'c69':53.9, 'c70':18.7, 'c71':37.5, 'c73':36.7, 'c74':25.0, 'c75':39.0, 'c76':26.2, 'c77':48.0, 'c78':43.8, 'c79':17.1, 'c80':25.1, 'c81':25.6, 'c82':62.3, 'c83':46.7}
 #TAU_MEM_EACH = {'c0':20.9}
 
+''' ################ CV RAW vs CV JKK ################## '''
+CV_silico_dic = {}
+NRRPdic = {}
+CV_silico_dic_JKK = {}
+NRRPdic_JKK = {}
+
+lambda_values = np.arange(0.1, 2.0, 0.1)
+
+for l in lambda_values:
+    print 'computing CV for lambda = %.1f' %l
+    NRRPdic['%.1f' %l]=[]
+    nrrp = poisson.rvs(l, size=100, loc=1)
+    #print nrrp
+    nrrp_mean = np.mean(nrrp)
+    nrrp_std = np.std(nrrp)
+    NRRPdic['%.1f' % l].append(nrrp_mean)
+    NRRPdic['%.1f' % l].append(nrrp_std)
+    CV_arr = []
+    CV_arr_jkk = []
+    for a, n in zip(range(1, 100), nrrp):
+        try:
+            file = 'noise_simulation_new03_%s.h5' % a
+            raw_data2 = h5py.File(RAW_DATA_PATH2 + file)
+            if n > 24:
+                sample_connection2 = raw_data2['nrrp24'].value
+            else:
+                sample_connection2 = raw_data2['nrrp%s' % n].value
+
+                AMP = []
+                for trace in sample_connection2:
+                    amp = []
+                    max, min, amplitudes = at.compute_amplitude2(trace, STIM_TIMES_silico, 1200)
+                    AMP.append(amplitudes)
+                    CV_jkk = at.cv_JKK(sample_connection2, STIM_TIMES_silico, 1200)
+                    CV_arr_jkk.append(CV_jkk)
+
+                amp_mean = np.mean(AMP, axis=0)
+                amp_std = np.std(AMP, axis=0)
+                cv = amp_std / amp_mean
+                CV_arr_jkk.append(cv)
+
+        except KeyError:
+            pass
+
+    CV_silico_dic['%.1f' %l] = CV_arr_jkk
+    CV_silico_dic_JKK['%.1f' %l] = CV_arr_jkk
+
+### PLOT
+plt.figure()
+for l in lambda_values:
+    CV_silico = np.mean(CV_silico_dic['%.1f' %l], axis = 0)
+    CV_silico_jkk = np.mean(CV_silico_dic_JKK['%.1f' %l], axis = 0)
+    plt.plot(CV_silico[0], CV_silico_jkk[0])
+plt.show()
+
 
 # ''' ############### CV PROFILES IN VITRO VS IN SILICO - JKKestimator ########################################## '''
 # ########### IN VITRO EXPERIMENTS
@@ -53,9 +107,9 @@ TAU_MEM_EACH = {'c0':20.9, 'c1':19.1, 'c2':30.4, 'c4':32.9, 'c10':33.3, 'c12':35
 # CV_vitro_std = np.std(CV_vitro, axis = 0)
 # CV_vitro_stderr = CV_vitro_std/np.sqrt(len(CV_vitro))
 #
-# print 'CV_vitro_JKK', CV_vitro_mean
-# print 'CV vitro std', CV_vitro_std
-# print 'CV vitro stderr', CV_vitro_stderr
+# # print 'CV_vitro_JKK', CV_vitro_mean
+# # print 'CV vitro std', CV_vitro_std
+# # print 'CV vitro stderr', CV_vitro_stderr
 #
 # ######### IN SILICO EXPERIMENTS
 #
@@ -74,10 +128,9 @@ TAU_MEM_EACH = {'c0':20.9, 'c1':19.1, 'c2':30.4, 'c4':32.9, 'c10':33.3, 'c12':35
 #     NRRPdic['%.1f' % l].append(nrrp_mean)
 #     NRRPdic['%.1f' % l].append(nrrp_std)
 #     CV_silico_arr = []
-#     #EPSP2_arr = []
 #     for a, n in zip(range(1, 100), nrrp):
 #         try:
-#             file = 'noise_simulation_new02_%s.h5' % a
+#             file = 'noise_simulation_new03_%s.h5' % a
 #             raw_data2 = h5py.File(RAW_DATA_PATH2 + file)
 #             if n > 24:
 #                 sample_connection2 = raw_data2['nrrp24'].value
@@ -115,6 +168,8 @@ TAU_MEM_EACH = {'c0':20.9, 'c1':19.1, 'c2':30.4, 'c4':32.9, 'c10':33.3, 'c12':35
 #     else:
 #         pass
 #
+#
+# # ## PLOT DISTANCE VS NRRP
 # # plt.figure(1)
 # # plt.xlabel('NRRP')
 # # plt.ylabel('error')
@@ -144,168 +199,153 @@ TAU_MEM_EACH = {'c0':20.9, 'c1':19.1, 'c2':30.4, 'c4':32.9, 'c10':33.3, 'c12':35
 #     ax.errorbar(STIM_NUM, CV_silico, label='inSilico', color = 'blue', yerr=CV_vitro_stderr, marker='o', linestyle='dotted', capsize=5)
 #     ax.errorbar(STIM_NUM, CV_vitro_mean, label='inVitro', color = 'red', yerr=CV_vitro_stderr, marker='o', linestyle='dotted', capsize=5)
 #     plt.legend()
-#     #plt.show()
-#     plt.savefig('/Users/natalibarros/Desktop/EPFL_BBP/MVR_warmupProject/TESTING-PROCEDURE/CV_profiles/SilicovsVitro_new_noise02_newJKK/lambda_%.1f.png' %l)
+#     plt.show()
+#     #plt.savefig('/Users/natalibarros/Desktop/EPFL_BBP/MVR_warmupProject/TESTING-PROCEDURE/CV_profiles/SilicovsVitro_new_noise02_newJKK/lambda_%.1f.png' %l)
 # #plt.show()
 
-
-''' ############### CV PROFILES IN VITRO VS IN SILICO (raw) ########################################## '''
-########### IN VITRO EXPERIMENTS
-raw_data = h5py.File(RAW_DATA_PATH)
-
-CV_connection = []
-CV_arr2 = []
-EPSP_vitro = []
-
-## we make a loop over all the connections in raw_data
-list_key = TAU_MEM_EACH.keys()
-
-for i in range(len(list_key)):
-    sample_connection = np.transpose(raw_data[list_key[i]].value)
-    sample_connection = sample_connection
-
-    amps = []
-    for sweep in sample_connection:
-        max, min, amplitudes = at.compute_amplitude2(sweep, STIM_TIMES, t_wind_aft)
-        amps.append(amplitudes)
-
-    amps_MEAN = np.mean(amps, axis=0)
-
-    DIF1 = []
-    for am in amps:
-        dif1 = (am - amps_MEAN) ** 2
-        DIF1.append(dif1)
-
-    N = np.float(len(sample_connection))
-    amps_STD = np.sqrt(np.sum(DIF1, axis=0)/N)
-
-    CV1 = amps_STD / amps_MEAN
-    mean = np.mean(amps, axis=0)
-    std = np.mean(amps, axis = 0)
-
-    CV_connection.append(CV1)
-
-
-CV_vitro = np.mean(CV_connection, axis=0)
-CV_vitro_std = np.std(CV_connection, axis = 0)
-CV_vitro_stderr = CV_vitro_std/np.sqrt(len(CV_connection))
-
-# plt.figure()
-# plt.plot(CV_vitro)
-# plt.show()
-
-
-# IN SILICO EXPERIMENTS
-EPSP_amp2_dic = {}
-CV_arr2_dic = {}
-NRRPdic = {}
-
-lambda_values = np.arange(0.1, 12.9, 0.1)
-
-for l in lambda_values:
-    print 'computing CV for lambda = %.1f' %l
-    NRRPdic['%.1f' %l]=[]
-    nrrp = poisson.rvs(l, size=100, loc=1)
-    #print nrrp
-    nrrp_mean = np.mean(nrrp)
-    nrrp_std = np.std(nrrp)
-    NRRPdic['%.1f' % l].append(nrrp_mean)
-    NRRPdic['%.1f' % l].append(nrrp_std)
-    CV2_arr = []
-    EPSP2_arr = []
-    for a, n in zip(range(1, 100), nrrp):
-        try:
-            file = 'noise_simulation_new03_%s.h5' % a
-            raw_data2 = h5py.File(RAW_DATA_PATH2 + file)
-            if n > 24:
-                sample_connection2 = raw_data2['nrrp24'].value
-            else:
-                sample_connection2 = raw_data2['nrrp%s' % n].value
-
-                #CV2 = []
-                AMP = []
-                for trace in sample_connection2:
-                    amp = []
-                    max, min, amplitudes = at.compute_amplitude2(trace, STIM_TIMES_silico, 1200)
-
-                    # for t in STIM_TIMES_silico:
-                    #     max = np.max(trace[t:t + 800])
-                    #     min = np.min(trace[t:t + 800])
-                    #     amp.append(np.abs(max - min))
-                    AMP.append(amplitudes)
-
-                # print 'amp', amp
-                amp_mean = np.mean(AMP, axis=0)
-                # print 'amp', amp_mean
-                amp_std = np.std(AMP, axis=0)
-                cv = amp_std / amp_mean
-                #print 'cv', cv
-                CV2_arr.append(cv)
-
-            #print CV2_arr
-        except KeyError:
-            pass
-
-    CV_arr2_dic['%.1f' %l] = CV2_arr
-
-
-##  COMPUTE DISTANCE
-DISTANCE=[]
-
-for l in lambda_values:
-    CV_silico = np.mean(CV_arr2_dic['%.1f' % l], axis=0)
-    #print 'mean', CV_silico
-    CV_silico_std = np.std(CV_arr2_dic['%.1f' %l], axis=0)
-    CV_silico_stderr = CV_silico_std/np.sqrt(len(CV_arr2_dic['%.1f' %l]))
-
-    distance = []
-    for i in range(9):
-        d = ((CV_silico[i] - CV_vitro[i])/CV_vitro_stderr[i])**2
-        distance.append(d)
-
-    D = np.sqrt(np.abs(np.sum(distance)))
-    DISTANCE.append(D)
-
-
-min_dis = np.min(DISTANCE)
-for d, l in zip(DISTANCE, lambda_values):
-    if d == min_dis:
-        print 'min distance = %s for lambda = %s' %(d, l)
-    else:
-        pass
-
-# plt.figure(1)
-# plt.xlabel('NRRP')
-# plt.ylabel('error')
+# ''' ############### CV PROFILES IN VITRO VS IN SILICO (raw) ########################################## '''
+# ########### IN VITRO EXPERIMENTS
+# raw_data = h5py.File(RAW_DATA_PATH)
+#
+# CV_connection = []
+# CV_arr2 = []
+# EPSP_vitro = []
+#
+# ## we make a loop over all the connections in raw_data
+# list_key = TAU_MEM_EACH.keys()
+#
+# for i in range(len(list_key)):
+#     sample_connection = np.transpose(raw_data[list_key[i]].value)
+#     sample_connection = sample_connection
+#
+#     amps = []
+#     for sweep in sample_connection:
+#         max, min, amplitudes = at.compute_amplitude2(sweep, STIM_TIMES, t_wind_aft)
+#         amps.append(amplitudes)
+#
+#     amps_MEAN = np.mean(amps, axis=0)
+#
+#     DIF1 = []
+#     for am in amps:
+#         dif1 = (am - amps_MEAN) ** 2
+#         DIF1.append(dif1)
+#
+#     N = np.float(len(sample_connection))
+#     amps_STD = np.sqrt(np.sum(DIF1, axis=0)/N)
+#
+#     CV1 = amps_STD / amps_MEAN
+#     mean = np.mean(amps, axis=0)
+#     std = np.mean(amps, axis = 0)
+#
+#     CV_connection.append(CV1)
+#
+#
+# CV_vitro = np.mean(CV_connection, axis=0)
+# CV_vitro_std = np.std(CV_connection, axis = 0)
+# CV_vitro_stderr = CV_vitro_std/np.sqrt(len(CV_connection))
+#
+# # plt.figure()
+# # plt.plot(CV_vitro)
+# # plt.show()
+#
+#
+# # IN SILICO EXPERIMENTS
+# EPSP_amp2_dic = {}
+# CV_arr2_dic = {}
+# NRRPdic = {}
+#
+# lambda_values = np.arange(0.1, 12.9, 0.1)
+#
+# for l in lambda_values:
+#     print 'computing CV for lambda = %.1f' %l
+#     NRRPdic['%.1f' %l]=[]
+#     nrrp = poisson.rvs(l, size=100, loc=1)
+#     #print nrrp
+#     nrrp_mean = np.mean(nrrp)
+#     nrrp_std = np.std(nrrp)
+#     NRRPdic['%.1f' % l].append(nrrp_mean)
+#     NRRPdic['%.1f' % l].append(nrrp_std)
+#     CV2_arr = []
+#     EPSP2_arr = []
+#     for a, n in zip(range(1, 100), nrrp):
+#         try:
+#             file = 'noise_simulation_new03_%s.h5' % a
+#             raw_data2 = h5py.File(RAW_DATA_PATH2 + file)
+#             if n > 24:
+#                 sample_connection2 = raw_data2['nrrp24'].value
+#             else:
+#                 sample_connection2 = raw_data2['nrrp%s' % n].value
+#
+#                 #CV2 = []
+#                 AMP = []
+#                 for trace in sample_connection2:
+#                     amp = []
+#                     max, min, amplitudes = at.compute_amplitude2(trace, STIM_TIMES_silico, 1200)
+#                     AMP.append(amplitudes)
+#
+#                 amp_mean = np.mean(AMP, axis=0)
+#                 amp_std = np.std(AMP, axis=0)
+#                 cv = amp_std / amp_mean
+#                 CV2_arr.append(cv)
+#
+#         except KeyError:
+#             pass
+#
+#     CV_arr2_dic['%.1f' %l] = CV2_arr
+#
+#
+# ##  COMPUTE DISTANCE
+# DISTANCE=[]
+#
+# for l in lambda_values:
+#     CV_silico = np.mean(CV_arr2_dic['%.1f' % l], axis=0)
+#     #print 'mean', CV_silico
+#     CV_silico_std = np.std(CV_arr2_dic['%.1f' %l], axis=0)
+#     CV_silico_stderr = CV_silico_std/np.sqrt(len(CV_arr2_dic['%.1f' %l]))
+#
+#     distance = []
+#     for i in range(9):
+#         d = ((CV_silico[i] - CV_vitro[i])/CV_vitro_stderr[i])**2
+#         distance.append(d)
+#
+#     D = np.sqrt(np.abs(np.sum(distance)))
+#     DISTANCE.append(D)
+#
+#
+# min_dis = np.min(DISTANCE)
 # for d, l in zip(DISTANCE, lambda_values):
-#     plt.plot(NRRPdic['%.1f' % l], d, 'b.')
-# plt.show()
-
-# ## PLOT CV PROFILES SILICO VS VITRO
-# fig, ax = plt.subplots(figsize=(7, 4))
-# plt.title('CV profile Vitro vs all Silico')
-# plt.xlabel('# stimulus')
-# plt.ylabel('CV value')
-# ax.errorbar(STIM_NUM, CV_vitro, label='inVitro', color='red', yerr=CV_vitro_stderr, marker='.',capsize=5)
-
-plt.figure()
-for l in lambda_values:
-    CV_silico = np.mean(CV_arr2_dic['%.1f' %l], axis=0)
-    # print CV_silico[0]
-    # plt.plot(NRRPdic['%.1f' % l], CV_silico[0], 'b.')
-    CV_silico_std = np.std(CV_arr2_dic['%.1f' %l], axis=0)
-    CV_silico_stderr = CV_silico_std/np.sqrt(len(CV_arr2_dic['%.1f' %l]))
-
-    fig, ax = plt.subplots(figsize=(7, 4))
-    plt.title('lambda=%.1f; nrrp=%.2f$\pm$%.2f' % (l, NRRPdic['%.1f' %l][0], NRRPdic['%.1f' %l][1]))
-    plt.xlabel('# stimulus')
-    plt.ylabel('CV value')
-    ax.errorbar(STIM_NUM, CV_silico, label='inSilico', color = 'blue', yerr=CV_vitro_stderr, marker='o', linestyle='dotted', capsize=5)
-    ax.errorbar(STIM_NUM, CV_vitro, label='inVitro', color = 'red', yerr=CV_vitro_stderr, marker='o', linestyle='dotted', capsize=5)
-    plt.legend()
-    plt.show()
-    #plt.savefig('/Users/natalibarros/Desktop/EPFL_BBP/MVR_warmupProject/TESTING-PROCEDURE/CV_profiles/SilicovsVitro_new_noise03_noJKK/lambda_%.1f.png' %l)
-plt.show()
+#     if d == min_dis:
+#         print 'min distance = %s for lambda = %s' %(d, l)
+#     else:
+#         pass
+#
+# # ## PLOT DISTANCE VS NRRP
+# # plt.figure(1)
+# # plt.xlabel('NRRP')
+# # plt.ylabel('error')
+# # for d, l in zip(DISTANCE, lambda_values):
+# #     plt.plot(NRRPdic['%.1f' % l], d, 'b.')
+# # plt.show()
+#
+# # ## PLOT CV PROFILES SILICO VS VITRO
+# # plt.figure()
+# for l in lambda_values:
+#     CV_silico = np.mean(CV_arr2_dic['%.1f' %l], axis=0)
+#     # print CV_silico[0]
+#     # plt.plot(NRRPdic['%.1f' % l], CV_silico[0], 'b.')
+#     CV_silico_std = np.std(CV_arr2_dic['%.1f' %l], axis=0)
+#     CV_silico_stderr = CV_silico_std/np.sqrt(len(CV_arr2_dic['%.1f' %l]))
+#
+#     fig, ax = plt.subplots(figsize=(7, 4))
+#     plt.title('lambda=%.1f; nrrp=%.2f$\pm$%.2f' % (l, NRRPdic['%.1f' %l][0], NRRPdic['%.1f' %l][1]))
+#     plt.xlabel('# stimulus')
+#     plt.ylabel('CV value')
+#     ax.errorbar(STIM_NUM, CV_silico, label='inSilico', color = 'blue', yerr=CV_vitro_stderr, marker='o', linestyle='dotted', capsize=5)
+#     ax.errorbar(STIM_NUM, CV_vitro, label='inVitro', color = 'red', yerr=CV_vitro_stderr, marker='o', linestyle='dotted', capsize=5)
+#     plt.legend()
+#     plt.show()
+#     #plt.savefig('/Users/natalibarros/Desktop/EPFL_BBP/MVR_warmupProject/TESTING-PROCEDURE/CV_profiles/SilicovsVitro_new_noise03_noJKK/lambda_%.1f.png' %l)
+# #plt.show()
 #############################################################################################################
 
 
