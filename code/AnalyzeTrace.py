@@ -235,9 +235,10 @@ def compute_amplitude2(deconv_trace, STIM_TIMES, t_wind_aft):
     return max, min, amplitudes
 
 
-def compute_cv(sample_connection,STIM_TIMES, t_wind_bef, t_wind_aft, TAU_MEM, R_INPUT, fs):
+def cv_deconv(sample_connection,STIM_TIMES, t_wind_bef, t_wind_aft, TAU_MEM, R_INPUT, fs):
     """
-    This function compute the CV profile of the PSP amplitudes in sample_connection
+    This function compute the CV profile of the EPSP amplitudes in sample_connection
+    This function filters and deconvolve the sweep before computing the amplitudes
     :param sample_connection: array with voltage traces
     :return amp_cv: list with cv values for each PSP
     """
@@ -256,7 +257,7 @@ def compute_cv(sample_connection,STIM_TIMES, t_wind_bef, t_wind_aft, TAU_MEM, R_
     return amp_cv
 
 
-def JKK_traces(sample_connection, STIM_TIMES, t_wind_aft):
+def cv_JKK(sample_connection, STIM_TIMES, t_wind_aft):
     """ This function computes the Jack Knife (bootstraping) mean traces from a set of traces in sample_connection.
     Also computes the peaks (max values) and minimum of these mean traces and the times for the peaks.
     From the max and min it computes the amplitudes and from amplitudes it computes the CV for each EPSP
